@@ -16,10 +16,13 @@ failed = 0
 def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
     global progress, failed
     for i in range(start, start+amount):
-        r = requests.get(
-            f"{collection_url}/{i}",
-            headers={"user-agent": random_useragent()}
-        )
+        try:
+            r = requests.get(
+                f"{collection_url}/{i}",
+                headers={"user-agent": random_useragent()}
+            )
+        except ConnectionError:
+            continue
 
         if r.status_code != 200:
             r2 = requests.get(
@@ -39,35 +42,6 @@ def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
 
         progress += 1
         db.add_attributes(collection_name, r.json())
-
-
-"""
-
-{
-    'name': 'HAPE #89', 
-    'description': '8192 next-generation, 
-    high-fashion HAPES.', 
-    'image': 'https://meta.hapeprime.com/89.png', 
-    'external_url': 'https://hapeprime.com', 
-    'attributes': [
-        {'trait_type': 'Fur', 'value': 'Geometric Urban'}, 
-        {'trait_type': 'Head', 'value': 'Pained'}, 
-        {'trait_type': 'Tattoos', 'value': 'Gambler'}, 
-        {'trait_type': 'Teeth', 'value': 'Golden Tooth'}, 
-        {'trait_type': 'Eyes', 'value': 'Blue}, 
-        {'trait_type': 'Clothing', 'value': 'HAPE T-Shirt (Desert Storm)'}, 
-        {'trait_type': 'Accessory', 'value': 'Backpack (Velvet Violet)'}, 
-        {'trait_type': 'Jewellery', 'value': 'HAPE Cuban Link (Gold)'}, 
-        {'trait_type': 'Headwear', 'value': 'Cat Headband (Black)'}, 
-        {'trait_type': 'Eyewear', 'value': 'Female Bug Eyes (Red)'}, 
-        {'trait_type': 'Earrings', 'value': 'Diamond'}, 
-        {'trait_type': 'Birthday', 'value': '07/02'}, 
-        {'trait_type': 'Heart Number','value': '363382404504'}
-    ]
-}
-"""
-
-
 
 
 def get_collection_data(collection_url: str, number_of_items: int, collection_name: str):

@@ -82,6 +82,7 @@ class Database:
             _t_lock.release()
 
     def rarest_attributes(self, table_name: str):
+        data = None
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
@@ -91,13 +92,15 @@ class Database:
             ORDER BY count
             LIMIT 10
             """)
+            data = self._cursor.fetchall()
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
             _t_lock.release()
-            return self._cursor.fetchall()
+            return data
 
     def rarest_values_of_attribute(self, table_name: str, attribute_type: str):
+        data = []
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
@@ -108,13 +111,15 @@ class Database:
             ORDER BY count
             LIMIT 10
             """, (attribute_type,))
+            data = self._cursor.fetchall()
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
             _t_lock.release()
-            return self._cursor.fetchall()
+            return data
 
     def number_of_values(self, table_name: str, attribute_value: str):
+        data = None
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
@@ -122,34 +127,39 @@ class Database:
             FROM {table_name}
             WHERE attribute_value = ?
             """, (attribute_value,))
+            data = self._cursor.fetchone()[0]
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
             _t_lock.release()
-            return self._cursor.fetchone()[0]
+            return data
 
     def total_number_of_values(self, table_name: str):
+        data = None
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
             SELECT COUNT(name)
             FROM {table_name}
             """)
+            data = self._cursor.fetchone()[0]
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
             _t_lock.release()
-            return self._cursor.fetchone()[0]
+            return data
 
     def size_of_table(self, table_name):
+        data = None
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"SELECT COUNT(DISTINCT name) FROM {table_name}")
+            data = self._cursor.fetchone()[0]
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
             _t_lock.release()
-            return self._cursor.fetchone()[0]
+            return data
 
     def __init__(self):
         self._connection = sqlite3.connect("nft.db", check_same_thread=False)
