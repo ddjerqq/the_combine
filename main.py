@@ -24,6 +24,7 @@ def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
         except ConnectionError:
             continue
 
+
         if r.status_code != 200:
             r2 = requests.get(
                 f"{collection_url}/{i}",
