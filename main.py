@@ -12,6 +12,8 @@ THREADS = 20  # change this to 4x your threads.
 progress = 1
 failed = 0
 
+# proxies = { 'http' : 'https://user:password@proxyip:port' }
+
 
 def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
     global progress, failed
@@ -98,6 +100,15 @@ def setup():
     welcome_screen()
 
 
+def collection_stat(collection_name: str, limit: int = 10) -> None:
+    rarest_attributes = db.rarest_attributes(collection_name, limit=limit)
+    total = db.total_number_of_values(collection_name)
+    for rarest_attributes in rarest_attributes:
+        print(rarest_attributes)
+        for attr in db.rarest_values_of_attribute(collection_name, rarest_attributes[0], limit=limit):
+            rgb(f"{attr[0]} has {attr[1]} {attr[2]}/{total} {round((attr[2] / total) * 100, 4)}%", "#00ff00")
+
+
 def main():
     setup()
 
@@ -138,18 +149,15 @@ def main():
         rgb(f"\n[!] {e}", "#ff0000")
 
     finally:
-        rgb(f"\n[+] {db.size_of_table(collection_name)} "
+        db.__save__()
+        rgb(f"\n[+] {db.amount_of_items(collection_name)} "
             f"items pulled successfully in {round(time.time() - time_start, 2)} seconds", "#00ff00")
         if failed > 0:
             rgb(f"[-] {failed} items failed {round(failed / number_of_items * 100, 2)}% of total", "#ff0000")
 
-        rarest_attributes = db.rarest_attributes(collection_name)
-        for rarest_attributes in rarest_attributes:
-            for attr in db.rarest_values_of_attribute(collection_name, rarest_attributes[0]):
-                total = db.total_number_of_values(collection_name)
-                rgb(f"{attr[0]} has {attr[1]} {attr[2]}/{total}", "#00ff00")
-                rgb(f"{round((attr[2] / total) * 100, 4)}%", "#00ff00")
+        collection_stat(collection_name)
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    print(db.rarest_value("hape"))
