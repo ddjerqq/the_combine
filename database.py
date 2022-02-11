@@ -107,11 +107,11 @@ class Database:
             _t_lock.release()
             return data
 
-    def get_total_values(self, table_name: str):
+    def get_distinct_values(self, table_name: str):
         """
         :param table_name:
         :return:
-        get total number of values in table
+        get total number of distinct different values in table
         >>> "hape" -> 9000 # "or something"
         """
         data = None
@@ -119,6 +119,27 @@ class Database:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
             SELECT COUNT(DISTINCT attribute_value)
+            FROM {table_name}
+            """)
+            data = self._cursor.fetchone()[0]
+        except Exception as e:
+            rgb(f"[!] {e}", "#ff0000")
+        finally:
+            _t_lock.release()
+            return data
+
+    def get_total_values(self, table_name: str):
+        """
+        :param table_name:
+        :return:
+        get total number of values in table
+        >>> "hape" -> 80000 # "or something"
+        """
+        data = None
+        try:
+            _t_lock.acquire(True)
+            self._cursor.execute(f"""
+            SELECT COUNT(attribute_value)
             FROM {table_name}
             """)
             data = self._cursor.fetchone()[0]
