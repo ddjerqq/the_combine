@@ -42,7 +42,7 @@ from utils import rgb
 },
 """
 
-_t_lock = threading.Lock()
+
 
 
 class Database:
@@ -64,19 +64,12 @@ class Database:
                     attr["trait_type"],
                     attr["value"]
                 ))
-            # TODO ASK IF THIS IS SLOWER THAN DOING IT IN BULK
-        try:
-            _t_lock.acquire(True)
+        # TODO ASK IF THIS IS SLOWER THAN DOING IT IN BULK
+        with self._t_lock:
             self._cursor.executemany(f"""
             INSERT INTO {table_name} (name, attribute_type, attribute_value)
             VALUES (?, ?, ?);
             """, attributes_tuples)
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-
-    # https://meta.hapeprime.com/
 
     """
     1.) Trait rarity ranking - solely dependent on the most rare trait a piece possesses
@@ -88,19 +81,22 @@ class Database:
     # TODO IMPLEMENT CONTAINS
     # TODO IMPLEMENT
     def get_rarest_items(self, table_name: str):
-        raise NotImplementedError
+        # either this, or the old method
+        with self._t_lock:
+            raise NotImplementedError
 
 
     def __init__(self):
         self._connection = sqlite3.connect("nft.db", check_same_thread = False)
         self._cursor = self._connection.cursor()
+        self._t_lock = threading.Lock()
 
     def __enter__(self):
-        _t_lock.acquire(True)
+        self._t_lock.acquire(True)
         return self._cursor
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        _t_lock.release()
+        self._t_lock.release()
         if exc_type:
             rgb(exc_type, "#ff0000")
             rgb(exc_val, "#ff0000")
