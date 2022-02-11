@@ -3,56 +3,15 @@ import threading
 
 from utils import rgb
 
-"""
-{
-"name": "HAPE #1",
-"description": "8192 next-generation, high-fashion HAPES.",
-"image": "https://meta.hapeprime.com/1.png",
-"external_url": "https://hapeprime.com",
-"attributes": [
-    {
-        "trait_type": "Fur",
-        "value": "Champagne"
-    },
-    {
-        "trait_type": "Head",
-        "value": "Pained"
-    },
-    {
-        "trait_type": "Eyes",
-        "value": "Peri Tone"
-    },
-    {
-        "trait_type": "Clothing",
-        "value": "Essential T-Shirt (Geometric Urban)"
-    },
-    {
-        "trait_type": "Headwear",
-        "value": "5 Panel (Red)"
-    },
-    {
-        "trait_type": "Birthday",
-        "value": "22/04"
-    },
-    {
-        "trait_type": "Heart Number",
-        "value": "020914375592"
-    }
-]
-},
-"""
-
-
-
 
 class Database:
     def create_table(self, table_name):
         self._cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS {table_name} 
         (
-            name            TEXT NOT NULL,
-            attribute_type  TEXT NOT NULL,
-            attribute_value TEXT NOT NULL
+            name            TEXT,
+            attribute_type  TEXT,
+            attribute_value TEXT
         );
         """)
 
@@ -71,20 +30,74 @@ class Database:
             VALUES (?, ?, ?);
             """, attributes_tuples)
 
-    """
-    1.) Trait rarity ranking - solely dependent on the most rare trait a piece possesses
-    2.) Average trait rarity - A simple average of the percentage frequency of all traits associated with a piece
-    3.) Statistical rarity   - Combining the percentage frequency of all traits by multiplying them together
-    4.) Rarity score         - Scored by summing up the inverse of the percentage frequency of all traits 
-    """
-
-    # TODO IMPLEMENT CONTAINS
-    # TODO IMPLEMENT
-    def get_rarest_items(self, table_name: str):
+    def get_rarest_items(self, table_name: str, limit: int = 20):
         # either this, or the old method
         with self._t_lock:
-            raise NotImplementedError
+            self._cursor.execute(f"""
+            DROP TABLE IF EXISTS tmp_{table_name}_appearance;
+            """)
+            self._cursor.execute(f"""
+            DROP TABLE IF EXISTS {table_name}_with_nulls;
+            """)
+            self._cursor.execute(f"""
+            CREATE TABLE {table_name}_with_nulls
+            AS
+            SELECT h.name, ha.attribute_type, hap.attribute_value
+            FROM (SELECT distinct(name) FROM {table_name}) as h
+            CROSS JOIN (SELECT DISTINCT(attribute_type) FROM {table_name}) as ha
+            LEFT JOIN {table_name} hap 
+            ON h.name = hap.name AND ha.attribute_type = hap.attribute_type;
+            """)
+            self._cursor.execute(f"""
+            INSERT INTO {table_name} 
+            VALUES(NULL, 'Traits count', NULL);
+            """)
+            self._cursor.execute(f"""
+            UPDATE {table_name}_with_nulls
+            SET attribute_value = name
+            where attribute_value is NULL;
+            """)
+            self._cursor.execute(f"""
+            CREATE TABLE tmp_{table_name}_appearance
+            AS
+            SELECT attribute_value,
+                   count(attribute_value) AS Appereance,
+                   count(*) OVER (PARTITION BY NULL) AS Total
+            FROM {table_name}_with_nulls AS h
+            GROUP BY attribute_value;
+            """)
+            self._cursor.execute(f"""
+            SELECT row_number() 
+            OVER (ORDER BY 1/exp(SUM(log((TA.Appereance / CAST(TA.Total AS FLOAT))))) DESC) 
+            AS RowNumber, h.name, 1/exp(SUM(log((TA.Appereance / CAST(TA.Total AS FLOAT))))) AS SCORE
+            FROM {table_name}_with_nulls as h
+            LEFT JOIN tmp_{table_name}_appearance as TA ON h.attribute_value=TA.attribute_value
+            GROUP BY h.name
+            ORDER BY SCORE DESC
+            LIMIT ?;
+            """, (limit,))
+            data = self._cursor.fetchall()
+            return data
 
+    def get_name_stat(self, table_name: str, name: str):
+        with self._t_lock:
+            self._cursor.execute(f"""
+            SELECT attribute_type, attribute_value
+            FROM {table_name}
+            WHERE name = ?;
+            """, (name,))
+            data = self._cursor.fetchall()
+            return data
+
+    def get_value_rarity(self, table_name: str, value: str):
+        with self._t_lock:
+            self._cursor.execute(f"""
+            SELECT COUNT(*)
+            FROM {table_name}
+            WHERE attribute_value = ?;
+            """, (value,))
+            data = self._cursor.fetchone()
+            return data[0]
 
     def __init__(self):
         self._connection = sqlite3.connect("nft.db", check_same_thread = False)
@@ -116,5 +129,41 @@ class Database:
         self.__save__()
         self._connection.close()
 
+    def get_item_stat(self, table_name: str, item_name: str) -> None:
+        g = "#00ff00"
+        orange = "#ffa500"
+        item_data = self.get_name_stat(table_name, item_name)
+        rgb("╔═══════════════════════════════════════════════════════════════════╗",
+            color=g)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {item_name:^66}", color=orange, newline=False)
+        rgb(f"║", color=g)
+        rgb("╠═══════════════╦═════════════════════════════════════════╦═════════╣",
+            color=g)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {'Attribute':<14}", color=orange, newline=False)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {'Value':<40}", color=orange, newline=False)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {'Rarity':<8}", color=orange, newline=False)
+        rgb(f"║", color = g)
+        rgb("╠═══════════════╬═════════════════════════════════════════╬═════════╣",
+            color=g)
+        for attr in item_data:
+            attr_rarity = 1 / self.get_value_rarity(table_name, attr[1]) * 100
+            rgb(f"║", color=g, newline=False)
+            rgb(f" {attr[0]:<14}", color=orange, newline=False)
+            rgb(f"║", color=g, newline=False)
+            rgb(f" {attr[1]:<40}", color=orange, newline=False)
+            rgb(f"║", color=g, newline=False)
+            rgb(f" {str(round(attr_rarity, 4)) + '%' :<8}", color=orange, newline=False)
+            rgb(f"║", color=g)
+        rgb("╚═══════════════╩═════════════════════════════════════════╩═════════╝",
+            color = g)
+
 
 database = Database()
+
+if __name__ == "__main__":
+    for item in database.get_rarest_items("hape", 3):
+        database.get_item_stat("hape", item[1])
