@@ -12,7 +12,7 @@ THREADS = 20  # change this to 4x your threads.
 progress = 1
 failed = 0
 
-# proxies = { 'http' : 'https://user:password@proxyip:port' }
+# proxies = { 'http' : 'https://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112' }
 
 
 def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):

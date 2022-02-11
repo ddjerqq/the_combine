@@ -59,7 +59,6 @@ class Database:
         );
         """)
 
-
     def add_attributes(self, table_name: str, nft_metadata: dict):
         attributes_tuples = []
         for attr in nft_metadata["attributes"]:
@@ -82,7 +81,6 @@ class Database:
         finally:
             _t_lock.release()
 
-
     """
 1.) Trait rarity ranking - solely dependent on the most rare trait a piece possesses
 2.) Average trait rarity - A simple average of the percentage frequency of all traits associated with a piece
@@ -90,18 +88,19 @@ class Database:
 4.) Rarity score         - Scored by summing up the inverse of the percentage frequency of all traits 
                            (rarity.tools website’s method)
     """
-    def get_total_values(self, table_name: str):
+
+    def get_total_names(self, table_name: str):
         """
         :param table_name:
         :return:
-        get total number of values in table
-        >>> "hape" -> 73,777
+        get total number of pieces in table
+        >>> "hape" -> 9,346
         """
         data = None
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
-            SELECT COUNT(*)
+            SELECT COUNT(DISTINCT name)
             FROM {table_name}
             """)
             data = self._cursor.fetchone()[0]
@@ -111,6 +110,47 @@ class Database:
             _t_lock.release()
             return data
 
+    def get_total_values(self, table_name: str):
+        """
+        :param table_name:
+        :return:
+        get total number of values in table
+        >>> "hape" -> 9000 # "or something"
+        """
+        data = None
+        try:
+            _t_lock.acquire(True)
+            self._cursor.execute(f"""
+            SELECT COUNT(DISTINCT attribute_value)
+            FROM {table_name}
+            """)
+            data = self._cursor.fetchone()[0]
+        except Exception as e:
+            rgb(f"[!] {e}", "#ff0000")
+        finally:
+            _t_lock.release()
+            return data
+
+    def get_total_attributes(self, table_name: str):
+        """
+        :param table_name:
+        :return:
+        get total number of attributes in table
+        >>> "hape" -> 16 # "or something"
+        """
+        data = None
+        try:
+            _t_lock.acquire(True)
+            self._cursor.execute(f"""
+            SELECT COUNT(DISTINCT attribute_type)
+            FROM {table_name}
+            """)
+            data = self._cursor.fetchone()[0]
+        except Exception as e:
+            rgb(f"[!] {e}", "#ff0000")
+        finally:
+            _t_lock.release()
+            return data
 
     def get_attribute_type_frequency(self, table_name: str, attribute_type: str):
         """
@@ -134,7 +174,6 @@ class Database:
         finally:
             _t_lock.release()
             return data
-
 
     def get_attribute_value_frequency(self, table_name: str, attribute_type: str, attribute_value: str):
         """
@@ -160,47 +199,23 @@ class Database:
             _t_lock.release()
             return data
 
-
-    def iter_attribute_type(self, table_name: str):
+    def get_traits_of_name(self, table_name: str, name: str):
         """
         :param table_name:
-        :return:
-        iterate through all attribute types
-        >>> "fur" -> "fur"
+        :param name: name of the monkey
+        :return: name type value
+        get all traits of a name
+        >>> "hape" -> ["fur", "champagne"]
         """
         data = None
         try:
             _t_lock.acquire(True)
             self._cursor.execute(f"""
-            SELECT DISTINCT attribute_type
+            SELECT name, attribute_type, attribute_value
             FROM {table_name}
-            """)
-            data = self._cursor.fetchall()
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-            _ = [x[0] for x in data]
-            return _
-
-
-    def iter_attribute_value(self, table_name: str, attribute_type: str):
-        """
-        :param table_name:
-        :param attribute_type:
-        :return item name and attribute value:
-        iterate through all attribute values and unpack into name and attribute value
-        >>> "fur", "champagne" -> "champagne"
-        >>> for name, value in iter_attribute_value(table_name, "Fur"):
-        """
-        data = None
-        try:
-            _t_lock.acquire(True)
-            self._cursor.execute(f"""
-            SELECT DISTINCT name, attribute_value
-            FROM {table_name}
-            WHERE attribute_type = ?
-            """, (attribute_type,))
+            WHERE name = ?
+            GROUP BY attribute_type, attribute_value;
+            """, (name,))
             data = self._cursor.fetchall()
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
@@ -208,24 +223,23 @@ class Database:
             _t_lock.release()
             return data
 
-
-    def get_value_amount(self, table_name: str, attribute_type: str, attribute_value: str):
+    def _get_value_rarity(self, table_name: str, attribute_value: str):
         """
         :param table_name:
-        :param attribute_type:
         :param attribute_value:
         :return:
         get rarity of a value
-        >>> "fur", "champagne" -> 0.01
+        >>> "champagne" -> "rare"
         """
         data = None
         try:
+            total = self.get_total_values(table_name)
             _t_lock.acquire(True)
             self._cursor.execute(f"""
-            SELECT COUNT(attribute_value)
+            SELECT (((COUNT(attribute_value) + 0.0 ) / ?) * 100) as rarity 
             FROM {table_name}
-            WHERE attribute_type = ? AND attribute_value = ?
-            """, (attribute_type, attribute_value))
+            WHERE attribute_value = ?
+            """, (total, attribute_value))
             data = self._cursor.fetchone()[0]
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
@@ -233,42 +247,61 @@ class Database:
             _t_lock.release()
             return data
 
-
-    def update_rarity(self, table_name: str, item_name: str, attribute_type: str, attribute_value: str, rarity: float):
+    # RULE 1
+    def get_rarest_trait_of_name(self, table_name: str, name: str):
         """
         :param table_name:
-        :param item_name:
-        :param attribute_type:
-        :param attribute_value:
-        :param rarity:
-        :return:
-        update rarity of a value
-        >>> "fur", "champagne" -> 0.01
-        """
-        try:
-            _t_lock.acquire(True)
-            self._cursor.execute(f"""
-            UPDATE {table_name}
-            SET rarity = ?
-            WHERE name = ? AND attribute_type = ? AND attribute_value = ?
-            """, (rarity, item_name, attribute_type, attribute_value))
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-
-
-    def amount_of_items(self, table_name):
-        """
-        :param table_name:
-        :return:
-        get amount of items from a collection table.
+        :param name: name of the monkey
+        :return: type value
+        get the rarest trait of a name
+        >>> "hape" -> ["fur", "champagne"]
         """
         data = None
         try:
             _t_lock.acquire(True)
-            self._cursor.execute(f"SELECT COUNT(DISTINCT name) FROM {table_name}")
-            data = self._cursor.fetchone()[0]
+            for rarity in self._get_value_rarity(table_name, name):
+                self._cursor.execute(f"""
+                SELECT attribute_type, attribute_value
+                FROM {table_name}
+                WHERE name = ? AND rarity = ?
+                """, (name, rarity))
+                data = self._cursor.fetchone()
+        except Exception as e:
+            rgb(f"[!] {e}", "#ff0000")
+        finally:
+            _t_lock.release()
+            return data
+
+    # RULE 2
+    def get_average_trait_rarity_of_name(self, table_name: str, name: str):
+        avg = []
+        for _name, _attr_type, _val in self.get_traits_of_name(table_name, name):
+            appearance_of_val = self.get_attribute_value_frequency(table_name, _attr_type, _val)
+            rarity = (appearance_of_val / self.get_total_values(table_name)) * 100
+            # print(_val, "has", rarity, "% rarity")
+            # DEBUG ^
+            avg.append(rarity)
+        return sum(avg) / len(avg)
+
+
+    def get_stat_name(self, table_name: str, name: str):
+        """
+        :param table_name:
+        :param name: name of the monkey
+        :return: name type value
+        get all traits of a name
+        >>> "hape #3" -> ["fur", "champagne"]
+        """
+        data = None
+        try:
+            _t_lock.acquire(True)
+            self._cursor.execute(f"""
+            SELECT name, attribute_type, attribute_value
+            FROM {table_name}
+            WHERE name = ?
+            GROUP BY attribute_type, attribute_value;
+            """, (name,))
+            data = self._cursor.fetchall()
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
@@ -277,14 +310,12 @@ class Database:
 
 
     def __init__(self):
-        self._connection = sqlite3.connect("nft.db", check_same_thread=False)
+        self._connection = sqlite3.connect("nft.db", check_same_thread = False)
         self._cursor = self._connection.cursor()
-
 
     def __enter__(self):
         _t_lock.acquire(True)
         return self._cursor
-
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         _t_lock.release()
@@ -294,7 +325,6 @@ class Database:
             rgb(exc_tb, "#ff0000")
         self._connection.commit()
 
-
     def __save__(self):
         try:
             self._connection.commit()
@@ -302,7 +332,6 @@ class Database:
             pass
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
-
 
     def __close__(self):
         rgb("\n[*] Database closed", "#00ff00")
@@ -312,16 +341,7 @@ class Database:
 
 database = Database()
 
-
 if __name__ == "__main__":
-    print("start iter")
-    progress = 0
-    total = database.get_total_values("hape")
-    for attribute in database.iter_attribute_type("hape"):
-        for name, value in database.iter_attribute_value("hape", attribute):
-            rarity = database.get_value_amount('hape', attribute, value) / total
-            database.update_rarity("hape", name, attribute, value, rarity)
-
-            # print(f"{name} - {attribute} - {value} - {rarity * 100:.6f}%")
-            rgb(f"\r[UPDATE] {progress / total:.4f}%", "#00ff00", newline=False)
-            progress += 1
+    print("HAPE #4280 ")
+    print("rarest trait", database.get_rarest_trait_of_name("hape", "HAPE #4280"))
+    print("average trait rarity", database.get_average_trait_rarity_of_name("hape", "HAPE #4280"), "%")
