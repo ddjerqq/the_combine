@@ -1,4 +1,5 @@
 import sys
+import argparse
 import requests
 import threading
 
@@ -7,14 +8,33 @@ from utils import *
 from headers import random_useragent
 from database import database as db
 
-# constants
+# Globals
 _t_lock = threading.Lock()
+# THIS IS DEFAULT VALUE, CAN BE CHANGED BY CLI ARGS
 THREADS = 20  # change this to 4x your threads.
 Progress = 1
 Failed = 0
 Done = False
 
-proxies = {"https": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
+
+arg_parser = argparse.ArgumentParser(description="FNRC - Feggz NFT Rarity Calculator")
+arg_parser.add_argument("-n", "--collection-name",
+                        help="Name of collection to use", type=str, default=None)
+
+arg_parser.add_argument("-u", "--url",
+                        help="URL of the metadata, it should be a url which supports url/1 url/2 url/3 url/4",
+                        type=str, default=None)
+
+arg_parser.add_argument("-c", "--count",
+                        help="Amount of items in a collection", type=int, default=None)
+
+arg_parser.add_argument("-t", "--threads",
+                        help="Number of threads to use", type=int, default=THREADS)
+
+args = vars(arg_parser.parse_args())
+
+
+proxy = {"https": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
 
 
 def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
@@ -44,7 +64,7 @@ def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
                         r2 = requests.get(
                             f"{collection_url}/{i}",
                             headers={"user-agent": random_useragent()},
-                            proxies=proxies
+                            proxies=proxy
                         )
                         if r2.status_code == 200:
                             data = r.json()
@@ -53,10 +73,10 @@ def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
                             time.sleep(1)
                             pass
                     except Exception as e:
-                        # rgb(f"\n[!] {e}", "#ff0000")
+                        rgb(f"\n[!] {e}", "#ff0000")
                         time.sleep(2)
             except Exception as e:
-                # rgb(f"\n[!] {e}", "#ff0000")
+                rgb(f"\n[!] {e}", "#ff0000")
                 time.sleep(2)
 
         Progress += 1
@@ -123,46 +143,57 @@ def setup():
     welcome_screen()
 
 
-# def collection_stat(collection_name: str, limit: int = 10) -> None:
-#     rarest_attributes = db.rarest_attributes(collection_name, limit=limit)
-#     total = db.total_number_of_values(collection_name)
-#     for rarest_attributes in rarest_attributes:
-#         print(rarest_attributes)
-#         for attr in db.rarest_values_of_attribute(collection_name, rarest_attributes[0], limit=limit):
-#             rgb(f"{attr[0]} has {attr[1]} {attr[2]}/{total} {round((attr[2] / total) * 100, 4)}%", "#00ff00")
+def main(
+        collection_url: str = None,
+        collection_name: str = None,
+        number_of_items: int = None) -> None:
+    """
+    Main function.
+    optionally pass the parameters, otherwise they will be prompted.
+    :param collection_url: default None
+    :param collection_name: default None
+    :param number_of_items: default None
+    :return: None
+    """
 
-
-def main():
-    setup()
-
-    rgb("[?] Enter collection's url", "#ffff00", newline=False)
-    collection_url = input(" > ")
     if collection_url.endswith("/"):
         collection_url = collection_url[:-1]
 
     if not collection_url:
-        rgb("[!] No collection url entered! quitting!", "#ff0000")
-        exit()
+        rgb("[?] Enter collection's url", "#ffff00", newline=False)
+        collection_url = input(" > ")
+        if collection_url.endswith("/"):
+            collection_url = collection_url[:-1]
+        elif not collection_url:
+            rgb("[!] No collection url entered! quitting!", "#ff0000")
+            sys.exit()
 
-    rgb("[?] Enter collection name", "#ffff00", newline=False)
-    collection_name = input(" > ")
-    if collection_name:
-        db.create_table(collection_name)
-    else:
-        rgb("[!] No collection name entered! quitting!", "#ff0000")
-        exit()
+    if not collection_name:
+        rgb("[?] Enter collection name", "#ffff00", newline=False)
+        collection_name = input(" > ")
+        if not collection_name:
+            rgb("[!] No collection name entered! quitting!", "#ff0000")
+            sys.exit()
+        else:
+            db.create_table(collection_name)
 
-    rgb("[?] Enter number of items you want to pull", "#ffff00", newline=False)
-    number_of_items = int(input(" > "))
+    if not number_of_items:
+        rgb("[?] Enter number of items you want to pull", "#ffff00", newline=False)
+        number_of_items = int(input(" > "))
+        if not number_of_items:
+            rgb("[!] No number of items entered! quitting!", "#ff0000")
+            sys.exit()
 
     time_start = time.time()
     rgb(f"[+] Started pulling data from {collection_name}", "#00ff00")
-    rgb(f"[+] Threads: {THREADS} | Amount per Thread {round(number_of_items / THREADS)}", "#00ff00")
+    rgb(f"[+] Threads: {THREADS} | Amount per Thread {number_of_items // THREADS}", "#00ff00")
 
     try:
+        # THIS IS GONNA BE HEAVY
         get_collection_data(collection_url, number_of_items, collection_name)
         counter = threading.Thread(target=_t_progress_ticker, args=(number_of_items,))
         counter.start()
+        # we join this, so we don't skip past thing
         counter.join()
 
     except KeyboardInterrupt:
@@ -173,23 +204,21 @@ def main():
 
     finally:
         db.__save__()
-        rgb(f"\n[+] total pieces - {db.get_total_names(collection_name)}              \n"
-            f"[+] total values - {db.get_total_values(collection_name)}             \n"
-            f"[+] distinct values - {db.get_distinct_values(collection_name)}       \n"
-            f"[+] distinct attributes - {db.get_total_attributes(collection_name)}  \n"
-            f"[+] items pulled successfully in {round(time.time() - time_start, 2)} seconds",
-            color="#00ff00"
-            )
-        if Failed > 0:
-            rgb(
-                f"[-] {Failed} items failed {round(Failed / number_of_items * 100, 2)}% of total",
-                color="#ff0000"
-            )
+
+        db.get_table_stat(collection_name)
+
+        rgb(f"[+] items pulled successfully in {round(time.time() - time_start, 2)} seconds \n"
+            f"[-] {Failed} items failed {round(Failed / number_of_items * 100, 2)}% of total",
+            color="#00ff00")
 
 
 if __name__ == "__main__":
-    main()
-    # print(db.get_total_names("hape"))
+    setup()
+    if args["url"] and args["collection_name"] and args["count"]:
+        main(args["url"], args["collection_name"], args["count"])
+    else:
+        main()
+
     # https://meta.hapeprime.com/
     # hape
     # please supply exact amount of items, or else BAN
