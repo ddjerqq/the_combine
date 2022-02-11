@@ -64,7 +64,7 @@ class Database:
                     attr["trait_type"],
                     attr["value"]
                 ))
-        # TODO change this so we UPDATE not insert for every new item
+            # TODO ASK IF THIS IS SLOWER THAN DOING IT IN BULK
         try:
             _t_lock.acquire(True)
             self._cursor.executemany(f"""
@@ -107,6 +107,7 @@ class Database:
             _t_lock.release()
             return data
 
+
     def get_distinct_values(self, table_name: str):
         """
         :param table_name:
@@ -127,6 +128,7 @@ class Database:
         finally:
             _t_lock.release()
             return data
+
 
     def get_total_values(self, table_name: str):
         """
@@ -149,6 +151,7 @@ class Database:
             _t_lock.release()
             return data
 
+
     def get_total_attributes(self, table_name: str):
         """
         :param table_name:
@@ -169,6 +172,7 @@ class Database:
         finally:
             _t_lock.release()
             return data
+
 
     def get_attribute_type_frequency(self, table_name: str, attribute_type: str):
         """
@@ -192,6 +196,7 @@ class Database:
         finally:
             _t_lock.release()
             return data
+
 
     def get_attribute_value_frequency(self, table_name: str, attribute_type: str, attribute_value: str):
         """
@@ -217,6 +222,7 @@ class Database:
             _t_lock.release()
             return data
 
+
     def get_traits_of_name(self, table_name: str, name: str):
         """
         :param table_name:
@@ -240,6 +246,7 @@ class Database:
         finally:
             _t_lock.release()
             return data
+
 
     def _get_value_rarity(self, table_name: str, attribute_value: str):
         """
@@ -302,29 +309,23 @@ class Database:
         return sum(avg) / len(avg)
 
 
-    def get_stat_name(self, table_name: str, name: str):
+    def get_table_stat(self, table_name: str):
         """
+        Get the stats of a table, print: \n
+        total pieces
+        total values
+        different values
+        different types
         :param table_name:
-        :param name: name of the monkey
         :return: name type value
         get all traits of a name
         >>> "hape #3" -> ["fur", "champagne"]
         """
-        data = None
-        try:
-            _t_lock.acquire(True)
-            self._cursor.execute(f"""
-            SELECT name, attribute_type, attribute_value
-            FROM {table_name}
-            WHERE name = ?
-            GROUP BY attribute_type, attribute_value;
-            """, (name,))
-            data = self._cursor.fetchall()
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-            return data
+        rgb(f"[+] total pieces - {self.get_total_names(table_name)}              \n"
+            f"[+] total values - {self.get_total_values(table_name)}             \n"
+            f"[+] distinct values - {self.get_distinct_values(table_name)}       \n"
+            f"[+] distinct attributes - {self.get_total_attributes(table_name)}  \n",
+            color="#00ff00")
 
 
     def __init__(self):
