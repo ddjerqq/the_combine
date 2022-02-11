@@ -12,39 +12,70 @@ THREADS = 20  # change this to 4x your threads.
 progress = 1
 failed = 0
 
-# proxies = { 'http' : 'https://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112' }
+proxies = {"https": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
 
 
 def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
     global progress, failed
     for i in range(start, start+amount):
+        if not i:
+            continue
+            # most of the time, we don't have item 0
+
         try:
             r = requests.get(
                 f"{collection_url}/{i}",
                 headers={"user-agent": random_useragent()}
             )
+
+            if r.status_code != 200:
+                r2 = requests.get(
+                    f"{collection_url}/{i}",
+                    headers={"user-agent": random_useragent()},
+                    proxies=proxies
+                )
+                if r2.status_code != 200:
+                    time.sleep(2)
+                    r3 = requests.get(
+                        f"{collection_url}/{i}",
+                        headers = {"user-agent": random_useragent()},
+                        proxies = proxies
+                    )
+                    if r3.status_code != 200:
+                        failed += 1
+                        progress += 1
+                        continue
+                    else:
+                        r = r3
+                else:
+                    r = r2
+
         except ConnectionError:
-            continue
-
-
-        if r.status_code != 200:
-            r2 = requests.get(
+            r1 = requests.get(
                 f"{collection_url}/{i}",
                 headers = {"user-agent": random_useragent()}
             )
-            if r2.status_code != 200:
-                failed += 1
-                progress += 1
-                if not failed % 3:
-                    db.__save__()
-                continue
+            if r1.status_code != 200:
+                time.sleep(2)
+                r2 = requests.get(
+                    f"{collection_url}/{i}",
+                    headers = {"user-agent": random_useragent()},
+                    proxies = proxies
+                )
+                if r2.status_code != 200:
+                    failed += 1
+                    progress += 1
+                    continue
+                else:
+                    r = r2
             else:
-                r = r2
+                r = r1
 
         # print(r.json())
 
         progress += 1
-        db.add_attributes(collection_name, r.json())
+        db.add_attributes(collection_name, nft_metadata=r.json())
+    db.__save__()
 
 
 def get_collection_data(collection_url: str, number_of_items: int, collection_name: str):
@@ -159,5 +190,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    print(db.rarest_value("hape"))
+    main()
+    # print(db.rarest_value("hape"))

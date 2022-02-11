@@ -1,7 +1,4 @@
 import sqlite3
-import os
-import time
-import json
 import threading
 
 from utils import rgb
@@ -62,24 +59,24 @@ class Database:
     def add_attributes(self, table_name: str, nft_metadata: dict):
         attributes_tuples = []
         for attr in nft_metadata["attributes"]:
-            attributes_tuples.append(
-                (
+            attributes_tuples.append((
                     nft_metadata["name"],
                     attr["trait_type"],
                     attr["value"]
-                )
-            )
-
+                ))
+        # TODO change this so we UPDATE not insert for every new item
         try:
             _t_lock.acquire(True)
             self._cursor.executemany(f"""
             INSERT INTO {table_name} (name, attribute_type, attribute_value)
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?);
             """, attributes_tuples)
         except Exception as e:
             rgb(f"[!] {e}", "#ff0000")
         finally:
             _t_lock.release()
+
+    # https://meta.hapeprime.com/
 
     """
 1.) Trait rarity ranking - solely dependent on the most rare trait a piece possesses
