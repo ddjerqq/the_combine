@@ -1,3 +1,4 @@
+import sys
 import requests
 import threading
 
@@ -9,39 +10,62 @@ from database import database as db
 # constants
 _t_lock = threading.Lock()
 THREADS = 20  # change this to 4x your threads.
-progress = 1
-failed = 0
+Progress = 1
+Failed = 0
+Done = False
+
+proxies = {"https": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
 
 
 def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
-    global progress, failed
+    global Progress, Failed, Done
+    if Done:
+        sys.exit()
+
     for i in range(start, start+amount):
-        try:
-            r = requests.get(
-                f"{collection_url}/{i}",
-                headers={"user-agent": random_useragent()}
-            )
-        except ConnectionError:
+        if not i:
             continue
+            # most of the time, we don't have item 0
+        if Done:
+            sys.exit()
 
-        if r.status_code != 200:
-            r2 = requests.get(
-                f"{collection_url}/{i}",
-                headers = {"user-agent": random_useragent()}
-            )
-            if r2.status_code != 200:
-                failed += 1
-                progress += 1
-                if not failed % 3:
-                    db.__save__()
-                continue
-            else:
-                r = r2
+        data = None
+        for _ in range(5):
+            try:
+                r = requests.get(
+                    f"{collection_url}/{i}",
+                    headers={"user-agent": random_useragent()}
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    break
+                else:
+                    try:
+                        r2 = requests.get(
+                            f"{collection_url}/{i}",
+                            headers={"user-agent": random_useragent()},
+                            proxies=proxies
+                        )
+                        if r2.status_code == 200:
+                            data = r.json()
+                            break
+                        else:
+                            time.sleep(1)
+                            pass
+                    except Exception as e:
+                        # rgb(f"\n[!] {e}", "#ff0000")
+                        time.sleep(2)
+            except Exception as e:
+                # rgb(f"\n[!] {e}", "#ff0000")
+                time.sleep(2)
 
-        # print(r.json())
+        Progress += 1
+        if data is not None:
+            db.add_attributes(collection_name, nft_metadata=data)
+        else:
+            Failed += 1
 
-        progress += 1
-        db.add_attributes(collection_name, r.json())
+    db.__save__()
 
 
 def get_collection_data(collection_url: str, number_of_items: int, collection_name: str):
@@ -75,16 +99,18 @@ def get_collection_data(collection_url: str, number_of_items: int, collection_na
 
 
 def _t_progress_ticker(total: int):
+    global Done
     while True:
         rgb(
-            f"\r[+] {progress:<5}/ {total} | failed: {failed} | {round((progress / total) * 100, 2)}%",
+            f"\r[+] {Progress:<5} / {total} | failed: {Failed} | {(Progress / total) * 100:.2f}%",
             "#00ff00",
             newline=False
         )
-        if progress >= total:
+        if Progress >= total:
+            Done = True
             break
     rgb(
-        f"\r[+] {total:<5}/ {total} | failed: {failed} | 100.00%",
+        f"\r[+] {total:<5} / {total} | failed: {Failed} | 100.00%",
         "#00ff00",
         newline = False
     )
@@ -95,6 +121,15 @@ def setup():
     if not os.path.isdir("data"):
         os.mkdir("data")
     welcome_screen()
+
+
+# def collection_stat(collection_name: str, limit: int = 10) -> None:
+#     rarest_attributes = db.rarest_attributes(collection_name, limit=limit)
+#     total = db.total_number_of_values(collection_name)
+#     for rarest_attributes in rarest_attributes:
+#         print(rarest_attributes)
+#         for attr in db.rarest_values_of_attribute(collection_name, rarest_attributes[0], limit=limit):
+#             rgb(f"{attr[0]} has {attr[1]} {attr[2]}/{total} {round((attr[2] / total) * 100, 4)}%", "#00ff00")
 
 
 def main():
@@ -137,18 +172,25 @@ def main():
         rgb(f"\n[!] {e}", "#ff0000")
 
     finally:
-        rgb(f"\n[+] {db.size_of_table(collection_name)} "
-            f"items pulled successfully in {round(time.time() - time_start, 2)} seconds", "#00ff00")
-        if failed > 0:
-            rgb(f"[-] {failed} items failed {round(failed / number_of_items * 100, 2)}% of total", "#ff0000")
-
-        rarest_attributes = db.rarest_attributes(collection_name)
-        for rarest_attributes in rarest_attributes:
-            for attr in db.rarest_values_of_attribute(collection_name, rarest_attributes[0]):
-                total = db.total_number_of_values(collection_name)
-                rgb(f"{attr[0]} has {attr[1]} {attr[2]}/{total}", "#00ff00")
-                rgb(f"{round((attr[2] / total) * 100, 4)}%", "#00ff00")
+        db.__save__()
+        rgb(f"\n[+] total pieces - {db.get_total_names(collection_name)}              \n"
+            f"[+] total values - {db.get_total_values(collection_name)}             \n"
+            f"[+] distinct values - {db.get_distinct_values(collection_name)}       \n"
+            f"[+] distinct attributes - {db.get_total_attributes(collection_name)}  \n"
+            f"[+] items pulled successfully in {round(time.time() - time_start, 2)} seconds",
+            color="#00ff00"
+            )
+        if Failed > 0:
+            rgb(
+                f"[-] {Failed} items failed {round(Failed / number_of_items * 100, 2)}% of total",
+                color="#ff0000"
+            )
 
 
 if __name__ == "__main__":
     main()
+    # print(db.get_total_names("hape"))
+    # https://meta.hapeprime.com/
+    # hape
+    # please supply exact amount of items, or else BAN
+    # 8192
