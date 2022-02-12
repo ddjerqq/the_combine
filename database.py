@@ -1,51 +1,7 @@
 import sqlite3
-import os
-import time
-import json
 import threading
 
 from utils import rgb
-
-"""
-{
-"name": "HAPE #1",
-"description": "8192 next-generation, high-fashion HAPES.",
-"image": "https://meta.hapeprime.com/1.png",
-"external_url": "https://hapeprime.com",
-"attributes": [
-    {
-        "trait_type": "Fur",
-        "value": "Champagne"
-    },
-    {
-        "trait_type": "Head",
-        "value": "Pained"
-    },
-    {
-        "trait_type": "Eyes",
-        "value": "Peri Tone"
-    },
-    {
-        "trait_type": "Clothing",
-        "value": "Essential T-Shirt (Geometric Urban)"
-    },
-    {
-        "trait_type": "Headwear",
-        "value": "5 Panel (Red)"
-    },
-    {
-        "trait_type": "Birthday",
-        "value": "22/04"
-    },
-    {
-        "trait_type": "Heart Number",
-        "value": "020914375592"
-    }
-]
-},
-"""
-
-_t_lock = threading.Lock()
 
 
 class Database:
@@ -53,124 +9,100 @@ class Database:
         self._cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS {table_name} 
         (
-            name            TEXT NOT NULL,
-            attribute_type  TEXT NOT NULL,
-            attribute_value TEXT NOT NULL
+            name            TEXT,
+            attribute_type  TEXT,
+            attribute_value TEXT
         );
         """)
 
     def add_attributes(self, table_name: str, nft_metadata: dict):
-        attributes_tuples = []
         for attr in nft_metadata["attributes"]:
-            attributes_tuples.append(
-                (
-                    nft_metadata["name"],
-                    attr["trait_type"],
-                    attr["value"]
-                )
-            )
+            with self._t_lock:
+                self._cursor.execute(f"""
+                INSERT INTO {table_name} (name, attribute_type, attribute_value)
+                VALUES (?, ?, ?);
+                """, (nft_metadata["name"], attr["trait_type"], attr["value"]))
 
-        try:
-            _t_lock.acquire(True)
-            self._cursor.executemany(f"""
-            INSERT INTO {table_name} (name, attribute_type, attribute_value)
-            VALUES (?, ?, ?)
-            """, attributes_tuples)
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-
-    def rarest_attributes(self, table_name: str):
-        data = None
-        try:
-            _t_lock.acquire(True)
+    def get_rarest_items(self, table_name: str, limit: int = 20):
+        # either this, or the old method
+        with self._t_lock:
             self._cursor.execute(f"""
-            SELECT attribute_type, COUNT(attribute_type) AS count
-            FROM {table_name}
-            GROUP BY attribute_type
-            ORDER BY count
-            LIMIT 10
+            DROP TABLE IF EXISTS tmp_{table_name}_appearance;
             """)
-            data = self._cursor.fetchall()
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-            return data
-
-    def rarest_values_of_attribute(self, table_name: str, attribute_type: str):
-        data = []
-        try:
-            _t_lock.acquire(True)
             self._cursor.execute(f"""
-            SELECT name, attribute_value, COUNT(attribute_value) AS count
-            FROM {table_name}
-            WHERE attribute_type = ?
-            GROUP BY attribute_value
-            ORDER BY count
-            LIMIT 10
-            """, (attribute_type,))
-            data = self._cursor.fetchall()
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-            return data
-
-    def number_of_values(self, table_name: str, attribute_value: str):
-        data = None
-        try:
-            _t_lock.acquire(True)
-            self._cursor.execute(f"""
-            SELECT COUNT(name)
-            FROM {table_name}
-            WHERE attribute_value = ?
-            """, (attribute_value,))
-            data = self._cursor.fetchone()[0]
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
-            return data
-
-    def total_number_of_values(self, table_name: str):
-        data = None
-        try:
-            _t_lock.acquire(True)
-            self._cursor.execute(f"""
-            SELECT COUNT(name)
-            FROM {table_name}
+            DROP TABLE IF EXISTS {table_name}_with_nulls;
             """)
-            data = self._cursor.fetchone()[0]
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
+            self._cursor.execute(f"""
+            CREATE TABLE {table_name}_with_nulls
+            AS
+            SELECT h.name, ha.attribute_type, hap.attribute_value
+            FROM (SELECT distinct(name) FROM {table_name}) as h
+            CROSS JOIN (SELECT DISTINCT(attribute_type) FROM {table_name}) as ha
+            LEFT JOIN {table_name} hap 
+            ON h.name = hap.name AND ha.attribute_type = hap.attribute_type;
+            """)
+            self._cursor.execute(f"""
+            INSERT INTO {table_name} 
+            VALUES(NULL, 'Traits count', NULL);
+            """)
+            self._cursor.execute(f"""
+            UPDATE {table_name}_with_nulls
+            SET attribute_value = name
+            where attribute_value is NULL;
+            """)
+            self._cursor.execute(f"""
+            CREATE TABLE tmp_{table_name}_appearance
+            AS
+            SELECT attribute_value,
+                   count(attribute_value) AS Appereance,
+                   count(*) OVER (PARTITION BY NULL) AS Total
+            FROM {table_name}_with_nulls AS h
+            GROUP BY attribute_value;
+            """)
+            self._cursor.execute(f"""
+            SELECT row_number() 
+            OVER (ORDER BY 1/exp(SUM(log((TA.Appereance / CAST(TA.Total AS FLOAT))))) DESC) 
+            AS RowNumber, h.name, 1/exp(SUM(log((TA.Appereance / CAST(TA.Total AS FLOAT))))) AS SCORE
+            FROM {table_name}_with_nulls as h
+            LEFT JOIN tmp_{table_name}_appearance as TA ON h.attribute_value=TA.attribute_value
+            GROUP BY h.name
+            ORDER BY SCORE DESC
+            LIMIT ?;
+            """, (limit,))
+            data = self._cursor.fetchall()
             return data
 
-    def size_of_table(self, table_name):
-        data = None
-        try:
-            _t_lock.acquire(True)
-            self._cursor.execute(f"SELECT COUNT(DISTINCT name) FROM {table_name}")
-            data = self._cursor.fetchone()[0]
-        except Exception as e:
-            rgb(f"[!] {e}", "#ff0000")
-        finally:
-            _t_lock.release()
+    def get_name_stat(self, table_name: str, name: str):
+        with self._t_lock:
+            self._cursor.execute(f"""
+            SELECT attribute_type, attribute_value
+            FROM {table_name}
+            WHERE name = ?;
+            """, (name,))
+            data = self._cursor.fetchall()
             return data
+
+    def get_value_rarity(self, table_name: str, value: str):
+        with self._t_lock:
+            self._cursor.execute(f"""
+            SELECT COUNT(*)
+            FROM {table_name}
+            WHERE attribute_value = ?;
+            """, (value,))
+            data = self._cursor.fetchone()
+            return data[0]
 
     def __init__(self):
-        self._connection = sqlite3.connect("nft.db", check_same_thread=False)
+        self._connection = sqlite3.connect("nft.db", check_same_thread = False)
         self._cursor = self._connection.cursor()
+        self._t_lock = threading.Lock()
 
     def __enter__(self):
-        _t_lock.acquire(True)
+        self._t_lock.acquire(True)
         return self._cursor
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        _t_lock.release()
+        self._t_lock.release()
         if exc_type:
             rgb(exc_type, "#ff0000")
             rgb(exc_val, "#ff0000")
@@ -190,9 +122,41 @@ class Database:
         self.__save__()
         self._connection.close()
 
+    def get_item_stat(self, table_name: str, item_name: str) -> None:
+        g = "#00ff00"
+        orange = "#ffa500"
+        item_data = self.get_name_stat(table_name, item_name)
+        rgb("╔═══════════════════════════════════════════════════════════════════╗",
+            color=g)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {item_name:^66}", color=orange, newline=False)
+        rgb(f"║", color=g)
+        rgb("╠═══════════════╦═════════════════════════════════════════╦═════════╣",
+            color=g)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {'Attribute':<14}", color=orange, newline=False)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {'Value':<40}", color=orange, newline=False)
+        rgb(f"║", color=g, newline=False)
+        rgb(f" {'Rarity':<8}", color=orange, newline=False)
+        rgb(f"║", color = g)
+        rgb("╠═══════════════╬═════════════════════════════════════════╬═════════╣",
+            color=g)
+        for attr in item_data:
+            attr_rarity = 1 / self.get_value_rarity(table_name, attr[1]) * 100
+            rgb(f"║", color=g, newline=False)
+            rgb(f" {attr[0]:<14}", color=orange, newline=False)
+            rgb(f"║", color=g, newline=False)
+            rgb(f" {attr[1]:<40}", color=orange, newline=False)
+            rgb(f"║", color=g, newline=False)
+            rgb(f" {str(round(attr_rarity, 4)) + '%' :<8}", color=orange, newline=False)
+            rgb(f"║", color=g)
+        rgb("╚═══════════════╩═════════════════════════════════════════╩═════════╝",
+            color = g)
+
 
 database = Database()
 
-
 if __name__ == "__main__":
-    pass
+    for item in database.get_rarest_items("hape", 3):
+        database.get_item_stat("hape", item[1])
