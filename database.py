@@ -16,19 +16,12 @@ class Database:
         """)
 
     def add_attributes(self, table_name: str, nft_metadata: dict):
-        attributes_tuples = []
         for attr in nft_metadata["attributes"]:
-            attributes_tuples.append((
-                    nft_metadata["name"],
-                    attr["trait_type"],
-                    attr["value"]
-                ))
-        # TODO ASK IF THIS IS SLOWER THAN DOING IT IN BULK
-        with self._t_lock:
-            self._cursor.executemany(f"""
-            INSERT INTO {table_name} (name, attribute_type, attribute_value)
-            VALUES (?, ?, ?);
-            """, attributes_tuples)
+            with self._t_lock:
+                self._cursor.execute(f"""
+                INSERT INTO {table_name} (name, attribute_type, attribute_value)
+                VALUES (?, ?, ?);
+                """, (nft_metadata["name"], attr["trait_type"], attr["value"]))
 
     def get_rarest_items(self, table_name: str, limit: int = 20):
         # either this, or the old method
