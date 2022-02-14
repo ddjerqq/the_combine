@@ -1,7 +1,7 @@
-import sys
 import argparse
 import requests
 import threading
+import ipfsApi
 
 # local
 from utils import *
@@ -11,7 +11,7 @@ from database import database as db
 # Globals
 _t_lock = threading.Lock()
 # THIS IS DEFAULT VALUE, CAN BE CHANGED BY CLI ARGS
-THREADS = 20  # change this to 4x your threads.
+THREADS = 100  # change this to 4x your threads.
 Progress = 1
 Failed = 0
 Done = False
@@ -75,6 +75,8 @@ def _t_pull(start: int, amount: int, collection_url: str, collection_name: str):
                         else:
                             time.sleep(0.5)
                     except Exception as e:
+                        # TODO find out what errors to expect here
+                        # real hackers don't log shit to the console
                         # rgb(f"\n[!] {e}", "#ff0000")
                         time.sleep(0.5)
             except Exception as e:
@@ -144,9 +146,9 @@ def _t_progress_ticker(total: int, start_time: float):
         f"\r[+] {total:<5} / {total} | "
         f"failed: {Failed} | "
         f"time elapsed: {time.time() - start_time:.2f} | "
-        f"done: 100.00%",
-        f"time per item: {(time_now - start_time) / Progress:.2f}"
-        "#00ff00",
+        f"done: 100.00%"
+        f"time per item: {(time_now - start_time) / Progress:.2f}\n",
+        color="#00ff00",
         newline = False
     )
 
@@ -229,12 +231,13 @@ def main(
     finally:
         db.__save__()
 
-        rgb(f"[+] items pulled successfully in {round(time.time() - time_start, 2)} seconds \n"
+        rgb(f"\n[+] {number_of_items} items pulled successfully in {round(time.time() - time_start, 2)} seconds \n"
             f"[-] {Failed} items failed {round(Failed / number_of_items * 100, 2)}% of total",
             color="#00ff00")
 
         for idx, item in enumerate(db.get_rarest_items(collection_name, 30)):
-            db.get_item_stat(collection_name, item[1])
+            # print(idx + 1, item)
+            db.get_item_stat(collection_name, item[1], short=True)
 
 
 if __name__ == "__main__":

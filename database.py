@@ -122,7 +122,7 @@ class Database:
         self.__save__()
         self._connection.close()
 
-    def get_item_stat(self, table_name: str, item_name: str) -> None:
+    def get_item_stat(self, table_name: str, item_name: str, short: bool = False) -> None:
         g = "#00ff00"
         orange = "#ffa500"
         item_data = self.get_name_stat(table_name, item_name)
@@ -131,6 +131,11 @@ class Database:
         rgb(f"║", color=g, newline=False)
         rgb(f" {item_name:^66}", color=orange, newline=False)
         rgb(f"║", color=g)
+        if short:
+            rgb("╚═══════════════════════════════════════════════════════════════════╝",
+                color = g)
+            return
+
         rgb("╠═══════════════╦═════════════════════════════════════════╦═════════╣",
             color=g)
         rgb(f"║", color=g, newline=False)
@@ -139,7 +144,7 @@ class Database:
         rgb(f" {'Value':<40}", color=orange, newline=False)
         rgb(f"║", color=g, newline=False)
         rgb(f" {'Rarity':<8}", color=orange, newline=False)
-        rgb(f"║", color = g)
+        rgb(f"║", color=g)
         rgb("╠═══════════════╬═════════════════════════════════════════╬═════════╣",
             color=g)
         for attr in item_data:
