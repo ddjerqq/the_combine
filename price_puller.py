@@ -64,6 +64,6 @@ def get_scores_of_collection(collection_name: str) -> list[Item]:
 
 
 if __name__ == "__main__":
-    metamounts = get_scores_of_collection("MetaMounts")
+    metamounts = get_scores_of_collection("metasmoothbrainclub")
     for item in metamounts:
         print(item)
