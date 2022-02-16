@@ -190,6 +190,7 @@ def pretty_iterable(iterable: Iterable) -> None:
     rgb(f"╚═══════╩═{'═' * max_size}═╝", color = g)
 
 
+
 if __name__ == "__main__":
     welcome_screen()
     pretty_iterable([str(i) * i for i in range(1, 50)])
