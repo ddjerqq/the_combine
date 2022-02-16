@@ -59,8 +59,8 @@ class TPuller(threading.Thread):
             rgb(
                 f"\r[+] #{TPuller.Progress:<4} | "
                 f"{round((TPuller.Progress + 1) / TPuller.Total * 100, 2):<5}% | "
-                f"time elapsed: {round(_time_now - _start_time, 2):<6} | "
-                f"avg time: {(_time_now - _start_time) / (TPuller.Progress + 1):.3f}",
+                f"{round(_time_now - _start_time, 2):<6}S | "
+                f"avg {(_time_now - _start_time) / (TPuller.Progress + 1):.3f}",
                 "#00ff00",
                 newline=False
             )
@@ -95,5 +95,5 @@ def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int
 
 
 if __name__ == "__main__":
-    spawn_demons("https://gateway.pinata.cloud/ipfs/QmdkYWDquJ8Bfa8zLwSa5553HWdBvTrAnM7GEkHdeiUJry", "test", 679)
+    spawn_demons("https://gateway.pinata.cloud/ipfs/QmdkYWDquJ8Bfa8zLwSa5553HWdBvTrAnM7GEkHdeiUJry", "test", 679, True)
     # puller.pull()

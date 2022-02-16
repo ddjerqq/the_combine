@@ -30,12 +30,14 @@ class Database:
 
 
     def _flush(self, table_name: str):
+        rgb(f"[+] Flushing {table_name}", color=0x00ff00)
         with self._t_lock:
             self._cursor.executemany(f"""
             INSERT INTO {table_name} (name, attribute_type, attribute_value)
             VALUES (?, ?, ?)
             """, self._items)
             self._connection.commit()
+        rgb(f"[+] Done", color=0x00ff00)
 
 
     def get_rarest_items(self, table_name: str, limit: int = 20):
