@@ -1,5 +1,4 @@
 import sqlite3
-from tkinter import N
 import pandas as pd
 
 # Used To create Training DB with required columns
