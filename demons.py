@@ -1,21 +1,25 @@
 import threading
+
+import requests.exceptions
+
 from utils import *
 from database import database as db
 
-MAX_THREADS = 32
+MAX_THREADS = 64
 
 
 class TPuller(threading.Thread):
-    Progress = 0
+    Progress = 1
     Total = None
-    Done = False
 
-    def __init__(self, start: int, amount: int, collection_uri: str, collection_name: str):
+
+    def __init__(self, start: int, amount: int, collection_uri: str, collection_name: str, json_at_the_end: bool):
         threading.Thread.__init__(self)
         self._start = start
         self._amount = amount
         self._collection_uri = collection_uri
         self._collection_name = collection_name
+        self._json_at_the_end = json_at_the_end
 
 
     def run(self):
@@ -24,43 +28,43 @@ class TPuller(threading.Thread):
             while True:
                 try:
                     r = requests.get(
-                        f"{self._collection_uri}/{i}",
+                        f"{self._collection_uri}/{i}.json" if self._json_at_the_end else f"{self._collection_uri}/{i}",
                         headers={"user-agent": random_useragent()},
                         proxies=PROXY if proxy_needed else None,
                     )
-                    if r.status_code in [404, 400]:
-                        sys.exit()
+                    if r.status_code == 404:
+                        if i > 0:
+                            sys.exit()
                     elif r.status_code == 200:
                         data = r.json()
                         break
                     else:
                         proxy_needed = True
-
-                except requests.exceptions.ProxyError or ConnectionError or requests.exceptions.SSLError:
-                    rgb(f"\n[!] Proxy error, connection timed out, or SSL error", "#ff0000")
-                    time.sleep(1)
-                except Exception as ex:
-                    rgb(f"\n[!!!RUFFIAN!!!] {type(ex)} {ex}", "#ff0000")
-                    time.sleep(1)
+                except KeyboardInterrupt:
+                    sys.exit()
+                except Exception:
+                    proxy_needed = True
 
             TPuller.Progress += 1
-            db.add_attributes(self._collection_name, data)
+
+            db.add_attributes(data)
 
 
     @staticmethod
     def _counter():
-        start_time = time.time()
-        while TPuller.Progress <= TPuller.Progress:
-            time_now = time.time()
+        _start_time = time.time()
+        # FIXME this is not working
+        while TPuller.Progress < TPuller.Total * 0.95:
+            _time_now = time.time()
             rgb(
-                f"\r[+] #{TPuller.Progress:<5} | "
-                f"{(TPuller.Progress / TPuller.Total) * 100:.2f}% | "
-                f"time elapsed: {time_now - start_time:.2f} | "
-                f"avg time: {(time_now - start_time) / TPuller.Progress:.2f}",
+                f"\r[+] #{TPuller.Progress:<4} | "
+                f"{round((TPuller.Progress + 1) / TPuller.Total * 100, 2):<5}% | "
+                f"time elapsed: {round(_time_now - _start_time, 2):<6} | "
+                f"avg time: {(_time_now - _start_time) / (TPuller.Progress + 1):.3f}",
                 "#00ff00",
-                newline = False
+                newline=False
             )
-            time.sleep(0.1)
+            time.sleep(0.05)
         else:
             print()
 
@@ -72,23 +76,22 @@ class TPuller(threading.Thread):
         t.join()
 
 
-
-def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int):
+def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int, json_at_the_end: bool):
     amount, remainder = divmod(number_of_items, MAX_THREADS)
     amounts = [amount + 1 if n < remainder else amount for n in range(MAX_THREADS)]
 
+    TPuller.Total = number_of_items
+
     for idx, amount in enumerate(amounts):
-        t = TPuller(idx, amount, collection_uri, collection_name)
+        t = TPuller(idx * amount, amount, collection_uri, collection_name, json_at_the_end)
         t.start()
 
     rgb(
-        f"[+] Started pulling {number_of_items} from {collection_name} with {MAX_THREADS} threads",
+        f"\r[+] Started pulling {number_of_items - 1} from {collection_name} with {MAX_THREADS} threads",
         0x00ff00
     )
 
     TPuller.start_counter()
-
-
 
 
 if __name__ == "__main__":
