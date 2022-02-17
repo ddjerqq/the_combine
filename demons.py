@@ -5,11 +5,13 @@ import requests.exceptions
 from utils import *
 from database import database as db
 
+
 MAX_THREADS = 64
 
 
 class TPuller(threading.Thread):
     Progress = 1
+    Die = False
     Total = None
 
 
@@ -26,20 +28,30 @@ class TPuller(threading.Thread):
         for i in range(self._start, self._start + self._amount):
             proxy_needed = False
             while True:
+                if TPuller.Die:
+                    sys.exit()
+
                 try:
                     r = requests.get(
                         f"{self._collection_uri}/{i}.json" if self._json_at_the_end else f"{self._collection_uri}/{i}",
                         headers={"user-agent": random_useragent()},
                         proxies=PROXY if proxy_needed else None,
                     )
-                    if r.status_code == 404:
-                        if i > 0:
-                            sys.exit()
-                    elif r.status_code == 200:
-                        data = r.json()
-                        break
-                    else:
-                        proxy_needed = True
+
+                    match r.status_code:
+                        case 404:
+                            if i > 0:
+                                sys.exit()
+                        case 200:
+                            data = r.json()
+                            break
+                        case 503:
+                            proxy_needed = True
+                        case _:
+                            proxy_needed = True
+
+                except requests.exceptions.ProxyError:
+                    proxy_needed = True
                 except KeyboardInterrupt:
                     sys.exit()
                 except Exception:
@@ -54,20 +66,27 @@ class TPuller(threading.Thread):
     def _counter():
         _start_time = time.time()
         # FIXME this is not working
-        while TPuller.Progress < TPuller.Total * 0.95:
+        progresses = []
+        while TPuller.Progress <= TPuller.Total:
             _time_now = time.time()
             rgb(
                 f"\r[+] #{TPuller.Progress:<4} | "
                 f"{round((TPuller.Progress + 1) / TPuller.Total * 100, 2):<5}% | "
                 f"{round(_time_now - _start_time, 2):<6}S | "
                 f"avg {(_time_now - _start_time) / (TPuller.Progress + 1):.3f}",
-                "#00ff00",
+                0x00ff00,
                 newline=False
             )
-            time.sleep(0.05)
-        else:
-            print()
 
+            # CHECK IF NO NEW DATA IS BEING SENT
+            progresses.append(TPuller.Progress)
+            if len(progresses) > 50:
+                progresses = progresses[1:]
+            if len(progresses) == 50 and progresses[-1] == progresses[0]:
+                TPuller.Die = True
+                break
+            time.sleep(0.15)
+        sys.exit()
 
     @staticmethod
     def start_counter():
@@ -95,5 +114,4 @@ def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int
 
 
 if __name__ == "__main__":
-    spawn_demons("https://gateway.pinata.cloud/ipfs/QmdkYWDquJ8Bfa8zLwSa5553HWdBvTrAnM7GEkHdeiUJry", "test", 679, True)
-    # puller.pull()
+    pass

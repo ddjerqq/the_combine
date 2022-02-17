@@ -15,7 +15,8 @@ LOGO = """
 ██║╚██╗██║ ██╔══╝      ██║       ╚════██║ ██║╚██╗██║   ╚██╔╝   ██╔═══╝  ██╔══╝   ██╔══██╗
 ██║ ╚████║ ██║         ██║       ███████║ ██║ ╚████║    ██║    ██║      ███████╗ ██║  ██║
 ╚═╝  ╚═══╝ ╚═╝         ╚═╝       ╚══════╝ ╚═╝  ╚═══╝    ╚═╝    ╚═╝      ╚══════╝ ╚═╝  ╚═╝"""
-PROXY = {"https": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
+
+PROXY = {"http": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
 
 
 def clear():
@@ -154,12 +155,19 @@ def prompt() -> tuple[str, str, bool]:
     )
     collection_name = collection_name.replace(" ", "_")
 
-
     collection_url = vinput(
-        "[str] Token hash (Qm...)",
-        lambda x: x.startswith("Qm") and len(x) == 46
+        "[str] Token hash (Qm...) OR http/s url without .json or / at the end",
+        lambda x:
+        ((x.startswith("Qm") and len(x) == 46) and x[-1].isalpha())
+        or
+        (x.startswith("http"))
     )
-    collection_url = "https://ipfs.io/ipfs/" + collection_url
+    if collection_url.startswith("Qm"):
+        collection_url = "https://ipfs.io/ipfs/" + collection_url
+    elif "ipfs" in collection_url:
+        collection_url = "https://ipfs.io/ipfs/" + collection_url.split("/")[-1]
+    else:
+        collection_url = collection_url if not collection_url.endswith("/") else collection_url[:-1]
 
 
     json_at_the_end = vinput(
@@ -167,7 +175,6 @@ def prompt() -> tuple[str, str, bool]:
         lambda x: x.lower() in ["y", "yes", "n", "no"]
     )
     json_at_the_end = json_at_the_end.lower() in ["y", "yes"]
-
 
     return collection_name, collection_url, json_at_the_end
 
