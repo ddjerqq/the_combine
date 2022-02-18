@@ -1,9 +1,5 @@
-import os
-
 import sqlite3
-import threading
-
-from utils import rgb
+from utils import *
 
 
 class Database(object):
@@ -12,6 +8,15 @@ class Database(object):
         with self._t_lock:
             self._cursor.execute(f"""
             DROP TABLE IF EXISTS {table_name};
+            """)
+            self._cursor.execute(f"""
+            DROP TABLE IF EXISTS {table_name}_images;
+            """)
+            self._cursor.execute(f"""
+            DROP TABLE IF EXISTS {table_name}_with_nulls;
+            """)
+            self._cursor.execute(f"""
+            DROP TABLE IF EXISTS tmp_{table_name}_appearance;
             """)
 
             self._cursor.execute(f"""
@@ -23,13 +28,46 @@ class Database(object):
             );
             """)
 
+            self._cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table_name}_images 
+            (
+                name       TEXT,
+                image_url  TEXT,
+                image      BLOB DEFAULT NULL
+            );
+            """)
+
     def add_attributes(self, nft_metadata: dict):
+        # validate keys
+        key_image = "image"
+        key_name = "name"
+        key_type = "trait_type"
+        key_value = "value"
+        for k, v in nft_metadata.items():
+            if "image" in k:
+                key_image = k
+            if "name" in k:
+                key_name = k
+            if "type" in k:
+                key_type = k
+            if "value" in k:
+                key_value = k
+
         with self._t_lock:
             for attr in nft_metadata["attributes"]:
+                if "value" not in attr:
+                    attr[key_value] = attr[key_type]
+
                 self._cursor.execute(f"""
                 INSERT INTO {self._table_name} (name, attribute_type, attribute_value)
                 VALUES (?, ?, ?);
-                """, (nft_metadata["name"], attr["trait_type"], attr["value"]))
+                """, (nft_metadata[key_name], attr[key_type], attr[key_value]))
+
+            self._cursor.execute(f"""
+            INSERT INTO {self._table_name}_images (name, image_url)
+            VALUES (?, ?);
+            """, (nft_metadata[key_name], nft_metadata[key_image]))
+
 
     def get_rarest_items(self, limit: int = 20):
         # either this, or the old method
@@ -90,6 +128,16 @@ class Database(object):
             data = self._cursor.fetchall()
             return data
 
+    def get_image_url(self, name: str):
+        with self._t_lock:
+            self._cursor.execute(f"""
+            SELECT image_url
+            FROM {self._table_name}_images
+            WHERE name= ?;
+            """, (name,))
+            data = self._cursor.fetchall()[0][0]
+            return data
+
     def get_value_rarity(self, value: str):
         with self._t_lock:
             self._cursor.execute(f"""
@@ -139,13 +187,17 @@ class Database(object):
 
     def __init__(self):
         self._connection = sqlite3.connect(
-            os.path.dirname(os.path.realpath(__file__)) + "\\nft.db",
+            ABSOLUTE_PATH + "\\nft.db",
             check_same_thread=False
         )
         self._cursor = self._connection.cursor()
         self._t_lock = threading.Lock()
         self._items: list[tuple[str, str, str]] = []
         self._table_name = None
+
+        if not os.path.exists(ABSOLUTE_PATH + "\\images\\"):
+            os.makedirs(ABSOLUTE_PATH + "\\images\\")
+
 
     def __enter__(self):
         self._t_lock.acquire(True)
@@ -162,6 +214,10 @@ class Database(object):
     def __save__(self):
         with self._t_lock:
             self._connection.commit()
+
+    def __close__(self):
+        with self._t_lock:
+            self._connection.close()
 
 
 database = Database()

@@ -19,6 +19,8 @@ LOGO = """
 
 PROXY = {"http": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
 
+ABSOLUTE_PATH = os.path.dirname(os.path.realpath(__file__))
+
 
 def clear():
     os.system("clear || cls")
@@ -65,7 +67,7 @@ def rgb(text: str, /, color: str | tuple | int = "#ffffff", *, newline: bool = T
             >>> rgb("ipsum", "#00ff00", newline=False)
     """
     if type(color) == str:
-        color = tuple(int(color.lstrip("#")[i: i + 2], 16) for i in (0, 2, 4))
+        color = tuple(int(color.lstrip("#")[_: _ + 2], 16) for _ in (0, 2, 4))
 
     elif type(color) == tuple:
         pass
@@ -90,7 +92,7 @@ def rgb(text: str, /, color: str | tuple | int = "#ffffff", *, newline: bool = T
     sys.stdout.flush()
 
 
-def vinput(question: str, validator: callable) -> str:
+def vinput(question: str, validator: callable = lambda x: x) -> str:
     """
     validates user input with this
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -148,8 +150,8 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
     # get thousands
     thousands = [0 for _ in range(10)]
     thousands_threads = []
-    for i in range(10):
-        t = threading.Thread(target=_t_check_item, args=(uri, i*1000, i, thousands, json_at_the_end))
+    for th in range(10):
+        t = threading.Thread(target=_t_check_item, args=(uri, th*1000, th, thousands, json_at_the_end))
         t.start()
         thousands_threads.append(t)
     for t in thousands_threads:
@@ -162,11 +164,13 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low = (idx - 1) * 1000
             break
 
+    rgb(f"\r[+] Range {low}-{low+1000}", color=0x00ff00, newline=False)
+
     # get hundreds
     hundreds = [0 for _ in range(10)]
     hundreds_threads = []
-    for i in range(10):
-        t = threading.Thread(target=_t_check_item, args=(uri, low + i*100, i, hundreds, json_at_the_end))
+    for hun in range(10):
+        t = threading.Thread(target=_t_check_item, args=(uri, low + hun*100, hun, hundreds, json_at_the_end))
         t.start()
         hundreds_threads.append(t)
     for t in hundreds_threads:
@@ -179,11 +183,13 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low += (idx - 1) * 100
             break
 
+    rgb(f"\r[+] Range {low}-{low + 100}", color=0x00ff00, newline=False)
+
     # get tens
     tens = [0 for _ in range(10)]
     tens_threads = []
-    for i in range(10):
-        t = threading.Thread(target = _t_check_item, args = (uri, low + i * 10, i, tens, json_at_the_end))
+    for tn in range(10):
+        t = threading.Thread(target = _t_check_item, args = (uri, low + tn * 10, tn, tens, json_at_the_end))
         t.start()
         tens_threads.append(t)
     for t in tens_threads:
@@ -196,11 +202,13 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low += (idx - 1) * 10
             break
 
+    rgb(f"\r[+] Range {low}-{low + 10}", color=0x00ff00, newline=False)
+
     # get ones
     ones = [0 for _ in range(10)]
     ones_threads = []
-    for i in range(10):
-        t = threading.Thread(target = _t_check_item, args = (uri, low + i, i, ones, json_at_the_end))
+    for on in range(10):
+        t = threading.Thread(target = _t_check_item, args = (uri, low + on, on, ones, json_at_the_end))
         t.start()
         ones_threads.append(t)
     for t in ones_threads:
@@ -213,6 +221,9 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low += idx - 1
             break
 
+    rgb(f"\r[+] Total {low}     ", color = 0x00ff00)
+    time.sleep(1)
+
     return low
 
 
@@ -224,19 +235,17 @@ def prompt() -> tuple[str, str, bool]:
         "[str] Enter collection name (only numbers and letters)",
         lambda x: x and all(c.isalpha() or c.isdigit() or c == " " for c in x)
     )
-    collection_name = collection_name.replace(" ", "_")
+    collection_name = collection_name.replace(" ", "_").lower()
 
     collection_url = vinput(
         "[str] Token hash (Qm...) OR http/s url without .json or / at the end",
         lambda x:
-        ((x.startswith("Qm") and len(x) == 46) and x[-1].isalpha())
+        (x.startswith("Qm") and len(x) == 46)
         or
         (x.startswith("http"))
     )
     if collection_url.startswith("Qm"):
         collection_url = "https://ipfs.io/ipfs/" + collection_url
-    elif "ipfs" in collection_url:
-        collection_url = "https://ipfs.io/ipfs/" + collection_url.split("/")[-1]
     else:
         collection_url = collection_url if not collection_url.endswith("/") else collection_url[:-1]
 
@@ -251,7 +260,7 @@ def prompt() -> tuple[str, str, bool]:
 
 
 def pretty_iterable(iterable: Iterable) -> None:
-    iterable = [str(i) for i in iterable]
+    iterable = [str(_) for _ in iterable]
     max_size = min(len(max(iterable, key=len)), 50)
 
     g = 0x00ff00
