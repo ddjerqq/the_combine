@@ -167,5 +167,5 @@ class Database(object):
 database = Database()
 
 if __name__ == "__main__":
-    for item in database.get_rarest_items("hape", 3):
-        database.get_item_stat("hape", item[1])
+    for item in database.get_rarest_items(limit=3):
+        database.get_item_stat(item[1])

@@ -13,9 +13,13 @@ def main() -> None:
     os.system(f"title \"NFT SNYPER | DDJERQQ | {c_name}\"")
 
     rgb(f"[#] Please wait...", color=0xffff00, newline=False)
-    number_of_items = binary_find(c_uri, j_end)
+
+    number_of_items = super_find(c_uri, j_end)
+
     clear()
+
     spawn_demons(c_uri, c_name, number_of_items, j_end)
+
     rgb(f"\n[+] Done\n", color=0x00ff00, newline=False)
 
     items = db.get_rarest_items(20)

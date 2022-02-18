@@ -1,20 +1,21 @@
 import os
-import string
 import sys
 import time
 import random
+import threading
 from typing import Iterable
+
 
 import requests
 from headers import random_useragent
 
 LOGO = """
-███╗   ██╗ ███████╗ ████████╗    ███████╗ ███╗   ██╗ ██╗   ██╗ ██████╗  ███████╗ ██████╗ 
-████╗  ██║ ██╔════╝ ╚══██╔══╝    ██╔════╝ ████╗  ██║ ╚██╗ ██╔╝ ██╔══██╗ ██╔════╝ ██╔══██╗
-██╔██╗ ██║ █████╗      ██║       ███████╗ ██╔██╗ ██║  ╚████╔╝  ██████╔╝ █████╗   ██████╔╝
-██║╚██╗██║ ██╔══╝      ██║       ╚════██║ ██║╚██╗██║   ╚██╔╝   ██╔═══╝  ██╔══╝   ██╔══██╗
-██║ ╚████║ ██║         ██║       ███████║ ██║ ╚████║    ██║    ██║      ███████╗ ██║  ██║
-╚═╝  ╚═══╝ ╚═╝         ╚═╝       ╚══════╝ ╚═╝  ╚═══╝    ╚═╝    ╚═╝      ╚══════╝ ╚═╝  ╚═╝"""
+███████╗ ███╗   ██╗ ██╗   ██╗ ██████╗  ███████╗ ██████╗ 
+██╔════╝ ████╗  ██║ ╚██╗ ██╔╝ ██╔══██╗ ██╔════╝ ██╔══██╗
+███████╗ ██╔██╗ ██║  ╚████╔╝  ██████╔╝ █████╗   ██████╔╝
+╚════██║ ██║╚██╗██║   ╚██╔╝   ██╔═══╝  ██╔══╝   ██╔══██╗
+███████║ ██║ ╚████║    ██║    ██║      ███████╗ ██║  ██║
+╚══════╝ ╚═╝  ╚═══╝    ╚═╝    ╚═╝      ╚══════╝ ╚═╝  ╚═╝"""
 
 PROXY = {"http": "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"}
 
@@ -111,38 +112,108 @@ def vinput(question: str, validator: callable) -> str:
     return ans
 
 
-def binary_find(uri: str, json_at_the_end: bool) -> int:
+def _t_check_item(uri: str, item_idx: int, idx: int, itemplace: list, json_at_the_end: bool):
+    proxy_needed = False
+    while 1:
+        try:
+            item_idx = 1 if not item_idx else item_idx
+            r = requests.get(
+                f"{uri}/{item_idx}.json" if json_at_the_end else f"{uri}/{item_idx}",
+                proxies=PROXY if proxy_needed else None,
+                headers={"user-agent": random_useragent()}
+            )
+            match r.status_code:
+                case 200:
+                    itemplace[idx] = 1
+                    break
+                case 404:
+                    itemplace[idx] = 0
+                    break
+                case _:
+                    proxy_needed = True
+                    continue
+        except requests.exceptions.ProxyError or ConnectionError:
+            pass
+
+
+def super_find(uri: str, json_at_the_end: bool) -> int:
     """
-    get number of items in a collection using binary magic 🎊!
+    get number of items in a collection using magic threads
     :param uri: please pass the uri ready for fetching
     :param json_at_the_end: bool, if the collection URI ends with json
     :return:
     """
-    proxy = False
     low = 0
-    high = 10000
-    while True:
-        if low >= high - 1:
+
+    # get thousands
+    thousands = [0 for _ in range(10)]
+    thousands_threads = []
+    for i in range(10):
+        t = threading.Thread(target=_t_check_item, args=(uri, i*1000, i, thousands, json_at_the_end))
+        t.start()
+        thousands_threads.append(t)
+    for t in thousands_threads:
+        t.join()
+
+    for idx, thousand in enumerate(thousands):
+        if thousand:
+            continue
+        else:
+            low = (idx - 1) * 1000
             break
 
-        mid = (low + high) // 2
-        try:
-            r1 = requests.get(
-                f"{uri}/{mid}.json" if json_at_the_end else f"{uri}/{mid}",
-                headers={"user-agent": random_useragent()},
-                proxies=PROXY if proxy else None
-            )
-        except ConnectionError or requests.exceptions.ProxyError:
-            proxy = True
-            continue
+    # get hundreds
+    hundreds = [0 for _ in range(10)]
+    hundreds_threads = []
+    for i in range(10):
+        t = threading.Thread(target=_t_check_item, args=(uri, low + i*100, i, hundreds, json_at_the_end))
+        t.start()
+        hundreds_threads.append(t)
+    for t in hundreds_threads:
+        t.join()
 
-        if r1.status_code in [404, 400]:
-            high = mid
-        elif r1.status_code == 200:
-            low = mid
+    for idx, hundred in enumerate(hundreds):
+        if hundred:
+            continue
         else:
-            proxy = True
-    return low + 1
+            low += (idx - 1) * 100
+            break
+
+    # get tens
+    tens = [0 for _ in range(10)]
+    tens_threads = []
+    for i in range(10):
+        t = threading.Thread(target = _t_check_item, args = (uri, low + i * 10, i, tens, json_at_the_end))
+        t.start()
+        tens_threads.append(t)
+    for t in tens_threads:
+        t.join()
+
+    for idx, ten in enumerate(tens):
+        if ten:
+            continue
+        else:
+            low += (idx - 1) * 10
+            break
+
+    # get ones
+    ones = [0 for _ in range(10)]
+    ones_threads = []
+    for i in range(10):
+        t = threading.Thread(target = _t_check_item, args = (uri, low + i, i, ones, json_at_the_end))
+        t.start()
+        ones_threads.append(t)
+    for t in ones_threads:
+        t.join()
+
+    for idx, one in enumerate(ones):
+        if one:
+            continue
+        else:
+            low += idx - 1
+            break
+
+    return low
 
 
 def prompt() -> tuple[str, str, bool]:
@@ -198,5 +269,7 @@ def pretty_iterable(iterable: Iterable) -> None:
 
 
 if __name__ == "__main__":
-    welcome_screen()
-    pretty_iterable([str(i) * i for i in range(1, 50)])
+    timestart = time.time()
+    i = super_find("https://ipfs.io/ipfs/QmUTFezR7ubZipbTr6HmSM9CVHmXYhXqAsiKQMaC3CG3o4", False)
+    print(time.time() - timestart)
+    print(i)
