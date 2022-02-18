@@ -12,10 +12,15 @@ class Client(object):
         self._socket.settimeout(0.5)
 
     def connect(self):
-        try:
-            self._socket.connect((SERVER_IP, PORT))
-        except Exception as e:
-            print(type(e), e)
+        while True:
+            try:
+                self._socket.connect((SERVER_IP, PORT))
+            except ConnectionRefusedError:
+                time.sleep(1)
+            except socket.timeout:
+                pass
+            except Exception as e:
+                print(type(e), e)
 
     def receive(self):
         try:

@@ -140,9 +140,15 @@ def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int
         t = TPuller(idx * amount, amount, collection_uri, collection_name, json_at_the_end)
         t.start()
 
-    rgb(
-        f"\r[+] Started pulling {number_of_items} from {collection_name} with {MAX_THREADS} threads",
-        0x00ff00
-    )
+    g = 0x00ff00
+    r = 0xff0000
+    rgb(f"\r[+] Started pulling ", color=g, newline=False)
+    rgb(f"{number_of_items} ", color=r, newline=False)
+    rgb(f"items from ", color=g, newline=False)
+    rgb(f"{collection_name} ", color=r, newline=False)
+    rgb(f"with ", color=g, newline=False)
+    rgb(f"{MAX_THREADS} ", color=r, newline=False)
+    rgb(f"threads from ", color=g, newline=False)
+    rgb(f"{collection_uri}", color=r)
 
     TPuller.start_counter()

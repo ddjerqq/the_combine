@@ -138,6 +138,27 @@ def _t_check_item(uri: str, item_idx: int, idx: int, itemplace: list, json_at_th
             pass
 
 
+def check_single_item(uri: str, item_idx: int, json_at_the_end: bool = False) -> bool:
+    proxy_needed = False
+    while 1:
+        try:
+            r = requests.get(
+                f"{uri}/{item_idx}.json" if json_at_the_end else f"{uri}/{item_idx}",
+                proxies = PROXY if proxy_needed else None,
+                headers = {"user-agent": random_useragent()}
+            )
+            match r.status_code:
+                case 200:
+                    return True
+                case 404:
+                    return False
+                case _:
+                    proxy_needed = True
+                    continue
+        except requests.exceptions.ProxyError or ConnectionError:
+            pass
+
+
 def super_find(uri: str, json_at_the_end: bool) -> int:
     """
     get number of items in a collection using magic threads
@@ -145,12 +166,17 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
     :param json_at_the_end: bool, if the collection URI ends with json
     :return:
     """
+    if check_single_item(uri, 10000, json_at_the_end):
+        return 10000
+    elif check_single_item(uri, 9999, json_at_the_end):
+        return 9999
+
     low = 0
 
     # get thousands
-    thousands = [0 for _ in range(10)]
+    thousands = [0 for _ in range(11)]
     thousands_threads = []
-    for th in range(10):
+    for th in range(11):
         t = threading.Thread(target=_t_check_item, args=(uri, th*1000, th, thousands, json_at_the_end))
         t.start()
         thousands_threads.append(t)
@@ -167,9 +193,9 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
     rgb(f"\r[+] Range {low}-{low+1000}", color=0x00ff00, newline=False)
 
     # get hundreds
-    hundreds = [0 for _ in range(10)]
+    hundreds = [0 for _ in range(11)]
     hundreds_threads = []
-    for hun in range(10):
+    for hun in range(11):
         t = threading.Thread(target=_t_check_item, args=(uri, low + hun*100, hun, hundreds, json_at_the_end))
         t.start()
         hundreds_threads.append(t)
@@ -183,12 +209,12 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low += (idx - 1) * 100
             break
 
-    rgb(f"\r[+] Range {low}-{low + 100}", color=0x00ff00, newline=False)
+    rgb(f"\r[+] Range {low}-{low+100}  ", color=0x00ff00, newline=False)
 
     # get tens
-    tens = [0 for _ in range(10)]
+    tens = [0 for _ in range(11)]
     tens_threads = []
-    for tn in range(10):
+    for tn in range(11):
         t = threading.Thread(target = _t_check_item, args = (uri, low + tn * 10, tn, tens, json_at_the_end))
         t.start()
         tens_threads.append(t)
@@ -202,12 +228,12 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low += (idx - 1) * 10
             break
 
-    rgb(f"\r[+] Range {low}-{low + 10}", color=0x00ff00, newline=False)
+    rgb(f"\r[+] Range {low}-{low+10}", color=0x00ff00, newline=False)
 
     # get ones
-    ones = [0 for _ in range(10)]
+    ones = [0 for _ in range(11)]
     ones_threads = []
-    for on in range(10):
+    for on in range(11):
         t = threading.Thread(target = _t_check_item, args = (uri, low + on, on, ones, json_at_the_end))
         t.start()
         ones_threads.append(t)
@@ -221,7 +247,7 @@ def super_find(uri: str, json_at_the_end: bool) -> int:
             low += idx - 1
             break
 
-    rgb(f"\r[+] Total {low}     ", color = 0x00ff00)
+    rgb(f"\r[+] Total {low}       ", color = 0x00ff00)
     time.sleep(1)
 
     return low
