@@ -115,7 +115,7 @@ class TPuller(threading.Thread):
 
     @staticmethod
     def downloader(*items: str, collection_name: str):
-        rgb("[+] Downloading images...", 0x00ff00)
+        rgb("[+] Downloading images...", 0x00ff00, newline=False)
         downloaders = []
         for item in items:
             url = db.get_image_url(item)
@@ -130,7 +130,7 @@ class TPuller(threading.Thread):
         for t in downloaders:
             t.join()
 
-        rgb("[+] Done", 0x00ff00)
+        rgb("\r[+] Done                ", 0x00ff00)
 
 
 def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int, json_at_the_end: bool):
@@ -138,6 +138,7 @@ def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int
     amounts = [amount + 1 if n < remainder else amount for n in range(MAX_THREADS)]
 
     TPuller.Total = number_of_items
+
     for idx, amount in enumerate(amounts):
         t = TPuller(idx * amount, amount, collection_uri, collection_name, json_at_the_end)
         t.start()

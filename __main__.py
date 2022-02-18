@@ -2,6 +2,8 @@ import demons
 from utils import *
 from database import database as db
 
+# TODO aws sites are sending us json in r.content and giving 403
+
 
 def main() -> None:
     os.system(f"title \"NFT SNYPER | DDJERQQ\"")

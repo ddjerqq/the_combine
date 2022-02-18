@@ -128,6 +128,12 @@ def _t_check_item(uri: str, item_idx: int, idx: int, itemplace: list, json_at_th
                 case 200:
                     itemplace[idx] = 1
                     break
+                case 403:
+                    if proxy_needed:
+                        itemplace[idx] = 0
+                        break
+                    else:
+                        proxy_needed = True
                 case 404:
                     itemplace[idx] = 0
                     break
@@ -145,13 +151,18 @@ def check_single_item(uri: str, item_idx: int, json_at_the_end: bool = False) ->
             r = requests.get(
                 f"{uri}/{item_idx}.json" if json_at_the_end else f"{uri}/{item_idx}",
                 proxies = PROXY if proxy_needed else None,
-                headers = {"user-agent": random_useragent()}
+                headers = {"User-Agent": random_useragent()}
             )
             match r.status_code:
                 case 200:
                     return True
                 case 404:
                     return False
+                case 403:
+                    if proxy_needed:
+                        return False
+                    else:
+                        proxy_needed = True
                 case _:
                     proxy_needed = True
                     continue
