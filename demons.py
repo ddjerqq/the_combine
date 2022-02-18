@@ -42,6 +42,8 @@ class TPuller(threading.Thread):
                             data = r.json()
                             break
                         case _:
+                            # TODO fix
+                            time.sleep(0.1)
                             proxy_needed = True
 
                 except requests.exceptions.ProxyError:
