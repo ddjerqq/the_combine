@@ -130,7 +130,7 @@ class TPuller(threading.Thread):
         for t in downloaders:
             t.join()
 
-        rgb("\r[+] Done                ", 0x00ff00)
+        rgb("\r[+] Done                 ", 0x00ff00)
 
 
 def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int, json_at_the_end: bool):

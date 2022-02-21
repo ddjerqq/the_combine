@@ -2,11 +2,9 @@ import demons
 from utils import *
 from database import database as db
 
-# TODO aws sites are sending us json in r.content and giving 403
-
 
 def main() -> None:
-    os.system(f"title \"NFT SNYPER | DDJERQQ\"")
+    os.system(f"title SNYPER")
 
     c_name, c_uri, j_end = prompt()
 
@@ -46,6 +44,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         _exit = vinput("\n[?] Enter to exit", lambda x: True)
-        sys.exit()
     finally:
         db.__close__()
