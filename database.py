@@ -68,7 +68,6 @@ class Database(object):
             VALUES (?, ?);
             """, (nft_metadata[key_name], nft_metadata[key_image]))
 
-
     def get_rarest_items(self, limit: int = 20):
         # either this, or the old method
         with self._t_lock:
@@ -197,7 +196,6 @@ class Database(object):
 
         if not os.path.exists(ABSOLUTE_PATH + "\\images\\"):
             os.makedirs(ABSOLUTE_PATH + "\\images\\")
-
 
     def __enter__(self):
         self._t_lock.acquire(True)
