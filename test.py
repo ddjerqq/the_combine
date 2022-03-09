@@ -10,63 +10,104 @@ from rgbprint.colors import Colors
 JSON = False
 HASH = "QmTB5PbqdjbQUnbbicjowL82oDvBUBVgR7gLddqxm6th3G"
 PROXY = "http://metacircuits:dZwUllzyyZWL41U0@p.litespeed.cc:31112"
+# PROVIDERS = ["ipfs.io", "gateway.ipfs.io"]
+PROVIDER = "ipfs.io"
 
-PROVIDERS = ["ipfs.io", "gateway.ipfs.io"]
 URI  = "http://{}/ipfs/{}/{}"
+IPURI = "http://httpbin.org/ip"
 COL_NAME = ""
-# TOTAL =
-METADATAS = []
 HEADER = lambda: {"accept": "application/json", "user-agent": random_useragent()}
 
+
+METADATAS = []
 MAX = 5049
-TASKS = 128
 
 
-async def _async_hyper_demon(start: int, amount: int) -> None:
-    async with aiohttp.ClientSession() as sesh:
-        for idx in range(start, amount):
-            proxy_needed = False
-            while True:
-                uri = URI.format(random.choice(PROVIDERS), HASH, idx)
-                try:
-                    r = await sesh.get(
-                        uri,
-                        headers=HEADER(),
-                        proxy=[None, PROXY][proxy_needed]
-                    )
-                    data = await r.json()
-                except Exception as e:
-                    await asyncio.sleep(0.15)
-                    proxy_needed = True
-                else:
-                    break
+async def _async_hyper_demon(session: aiohttp.ClientSession, start_time: float | int, item: int) -> None:
+    proxy_needed = False
+    while True:
+        uri = URI.format(PROVIDER, HASH, item)
+        try:
+            r = await session.get(
+                uri,
+                headers=HEADER(),
+                proxy=PROXY if proxy_needed else None
+            )
+            data = await r.json()
+        except Exception:
+            await asyncio.sleep(0.5)
+            proxy_needed = True
+        else:
+            break
 
-            metadata = Metadata.from_json(data)
-            METADATAS.append(metadata)
+    metadata = Metadata.from_json(data)
+    METADATAS.append(metadata)
 
-            print(f"\rprogress [{len(METADATAS):05}]", end="", flush=True, color=Colors.GREEN)
+    # progress print
+    if not item % 3:
+        total = len(METADATAS)
+        t = int((time.time() - start_time) * 1_000)
+        print(f"\rprogress [{total:05}] total: [{t:06}] milliseconds",
+              end = "", flush = True, color = Colors.GREEN)
 
 
+def main():
+    running_loop = asyncio.get_event_loop()
 
-async def main():
-    start = time.time()
+    total_start = time.time()
+    session = aiohttp.ClientSession()
 
-    hyper_demons = []
+    hyper_demon_group = asyncio.gather(*[_async_hyper_demon(session, total_start, item) for item in range(MAX)])
 
-    amount = MAX // TASKS
+    running_loop.run_until_complete(hyper_demon_group)
 
-    for i in range(TASKS):
-        hd = asyncio.create_task(_async_hyper_demon(i * amount, (i * amount) + amount))
-        hyper_demons.append(hd)
+    print(f"\npulling {len(METADATAS)} items took {(time.time() - total_start):.4f} seconds")
 
-    for hd in hyper_demons:
-        await hd
+    running_loop.run_until_complete(session.close())
 
-    print(f"\npulling {len(METADATAS)} took {(time.time() - start):.3f} with {TASKS} tasks")
-    # print(*METADATAS, sep="\n")
+    # feature save data here
+    # feature OR save it dynamically, but that will slow us down
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    uri = "QmTB5PbqdjbQUnbbicjowL82oDvBUBVgR7gLddqxm6th3G"
+    uri = "https://meta.hape.com/"
+
+    if uri.startswith("Qm") and len(uri) == 46:
+        uri = f"http://ipfs.io/ipfs/{uri}/{{}}"
+
+    elif "/" in uri and "Qm" in uri:
+        for part in uri.split("/"):
+            if part.startswith("Qm"):
+                uri = part
+        uri = f"http://ipfs.io/ipfs/{uri}/{{}}"
+
+    else:
+        # test
+        if uri[-1].isdigit():
+            digilast = uri.split("/")[-1]
+            uri = uri.replace(digilast, "")
+        uri = uri.replace("https", "http")
+        uri += "{}"
+
+
+    print(uri)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
