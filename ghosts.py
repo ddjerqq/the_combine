@@ -52,6 +52,10 @@ async def _ghost(
         print(f"\r[+] progress [{progress_tracker[0]:05}]",
               end="", flush=True, color=Colors.GREEN)
 
+    # TODO
+    # riti gansxvavdeba thc-hydra sgan
+    # aris tu ara medusa async?
+
     return metadata
 
 
@@ -62,6 +66,7 @@ def summon(uri_or_hash: str, _max: int, col_name: str, *, loop: asyncio.BaseEven
     session = aiohttp.ClientSession()
 
     if "Qm" in uri_or_hash.split("/"):
+        ...
 
     uri = ...
 

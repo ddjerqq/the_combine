@@ -1,5 +1,4 @@
 import time
-import random
 import asyncio
 import aiohttp
 from headers import random_useragent
@@ -57,7 +56,8 @@ def main():
     total_start = time.time()
     session = aiohttp.ClientSession()
 
-    hyper_demon_group = asyncio.gather(*[_async_hyper_demon(session, total_start, item) for item in range(MAX)])
+    demons = [_async_hyper_demon(session, total_start, item) for item in range(MAX)]
+    hyper_demon_group = asyncio.gather(*demons)
 
     running_loop.run_until_complete(hyper_demon_group)
 
@@ -70,44 +70,30 @@ def main():
 
 
 if __name__ == "__main__":
-    uri = "QmTB5PbqdjbQUnbbicjowL82oDvBUBVgR7gLddqxm6th3G"
-    uri = "https://meta.hape.com/"
+    # uri = "QmTB5PbqdjbQUnbbicjowL82oDvBUBVgR7gLddqxm6th3G"
+    # uri = "https://meta.hape.com/"
+    #
+    # if uri.startswith("Qm") and len(uri) == 46:
+    #     uri = f"http://ipfs.io/ipfs/{uri}/{{}}"
+    #
+    # elif "/" in uri and "Qm" in uri:
+    #     for part in uri.split("/"):
+    #         if part.startswith("Qm"):
+    #             uri = part
+    #     uri = f"http://ipfs.io/ipfs/{uri}/{{}}"
+    #
+    # else:
+    #     # test
+    #     if uri[-1].isdigit():
+    #         digilast = uri.split("/")[-1]
+    #         uri = uri.replace(digilast, "")
+    #     uri = uri.replace("https", "http")
+    #     uri += "{}"
+    #
+    #
+    # print(uri)
 
-    if uri.startswith("Qm") and len(uri) == 46:
-        uri = f"http://ipfs.io/ipfs/{uri}/{{}}"
+    main()
 
-    elif "/" in uri and "Qm" in uri:
-        for part in uri.split("/"):
-            if part.startswith("Qm"):
-                uri = part
-        uri = f"http://ipfs.io/ipfs/{uri}/{{}}"
-
-    else:
-        # test
-        if uri[-1].isdigit():
-            digilast = uri.split("/")[-1]
-            uri = uri.replace(digilast, "")
-        uri = uri.replace("https", "http")
-        uri += "{}"
-
-
-    print(uri)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    for i in METADATAS:
+        print(i)

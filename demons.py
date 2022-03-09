@@ -155,3 +155,6 @@ def spawn_demons(collection_uri: str, collection_name: str, number_of_items: int
     rgb(f"{collection_uri}", color=r)
 
     TPuller.start_counter()
+
+
+
