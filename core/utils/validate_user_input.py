@@ -1,0 +1,9 @@
+def extract_ipfs_hash(user_input):
+    ...
+
+
+def website_from_hash(ipfs_hash):
+    # http://ipfs.io/ipfs/Qm...
+    # https://ipfs.io/ipfs/Qm...{id}
+    # http://goriall/{id}.json
+    ...
