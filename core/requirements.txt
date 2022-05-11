@@ -1,6 +1,0 @@
-aiosqlie
-aiohttp
-rgbprint
-pandas
-numpy
-matplotlib
